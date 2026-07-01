@@ -14,11 +14,7 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
   <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
       background: linear-gradient(145deg, #0b1a2e 0%, #1a2f44 100%);
       min-height: 100vh;
@@ -222,17 +218,21 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
-      padding: 6px 12px;
+      padding: 8px 14px;
       background: rgba(0, 0, 0, 0.15);
       border-radius: 30px;
       margin-bottom: 4px;
       font-size: 0.85rem;
+      transition: 0.2s;
+    }
+    .historial-item:hover {
+      background: rgba(255, 255, 255, 0.05);
     }
     .historial-item .badge {
       font-size: 0.7rem;
     }
     .historial-container {
-      max-height: 120px;
+      max-height: 200px;
       overflow-y: auto;
     }
     .historial-container::-webkit-scrollbar {
@@ -242,18 +242,6 @@
       background: #4b7a9c;
       border-radius: 10px;
     }
-    .btn-ver-mapa {
-      background: rgba(255, 255, 255, 0.05);
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      color: #a0c4e8;
-      border-radius: 40px;
-      padding: 2px 12px;
-      font-size: 0.75rem;
-    }
-    .btn-ver-mapa:hover {
-      background: rgba(255, 255, 255, 0.1);
-      color: white;
-    }
     .pin-incorrecto {
       border-color: #f03a47 !important;
       box-shadow: 0 0 0 3px rgba(240, 58, 71, 0.2) !important;
@@ -261,6 +249,31 @@
     .pin-correcto {
       border-color: #2b8c5e !important;
       box-shadow: 0 0 0 3px rgba(43, 140, 94, 0.2) !important;
+    }
+    .historial-count {
+      background: rgba(255, 255, 255, 0.05);
+      padding: 2px 10px;
+      border-radius: 30px;
+      font-size: 0.75rem;
+    }
+    .evento-activacion {
+      border-left: 3px solid #f03a47;
+    }
+    .evento-desactivacion {
+      border-left: 3px solid #2b8c5e;
+    }
+    /* Botón de prueba de sonido */
+    .btn-test-sound {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      color: #a0c4e8;
+      border-radius: 40px;
+      padding: 4px 16px;
+      font-size: 0.8rem;
+    }
+    .btn-test-sound:hover {
+      background: rgba(255, 255, 255, 0.1);
+      color: white;
     }
   </style>
 </head>
@@ -319,6 +332,9 @@
             <span id="pinStatus" class="badge bg-secondary bg-opacity-25 px-3 py-1 rounded-pill small">
               <i class="bi bi-lock me-1"></i> PIN no registrado
             </span>
+            <button class="btn-test-sound" id="btnTestSound">
+              <i class="bi bi-volume-up me-1"></i> Probar sonido
+            </button>
           </div>
 
           <!-- ESTADO DE ALARMA -->
@@ -342,7 +358,7 @@
             </button>
           </div>
 
-          <!-- MAPA (geolocalización) -->
+          <!-- MAPA -->
           <div class="map-container mb-3">
             <div id="map"></div>
             <div class="map-label">
@@ -350,13 +366,14 @@
             </div>
           </div>
 
-          <!-- TABS: Historial + Actividad -->
+          <!-- TABS -->
           <ul class="nav nav-tabs nav-justified mb-3" style="border-color: rgba(255,255,255,0.05);" id="myTab" role="tablist">
             <li class="nav-item" role="presentation">
               <button class="nav-link active" id="historial-tab" data-bs-toggle="tab" 
                       data-bs-target="#historial" type="button" role="tab" 
                       style="color: #a0c4e8; border-radius: 30px 30px 0 0;">
-                <i class="bi bi-clock-history me-1"></i> Historial
+                <i class="bi bi-clock-history me-1"></i> Historial Global
+                <span class="historial-count" id="historialCount">0</span>
               </button>
             </li>
             <li class="nav-item" role="presentation">
@@ -369,21 +386,23 @@
           </ul>
 
           <div class="tab-content">
-            <!-- Historial -->
+            <!-- Historial GLOBAL -->
             <div class="tab-pane fade show active" id="historial" role="tabpanel">
               <div class="d-flex justify-content-between align-items-center mb-2">
-                <small class="opacity-50">Últimos eventos registrados</small>
+                <small class="opacity-50">
+                  <i class="bi bi-people me-1"></i> Todos los vecinos
+                </small>
                 <button class="btn-limpiar" id="btnRefrescarHistorial">
                   <i class="bi bi-arrow-clockwise me-1"></i> Refrescar
                 </button>
               </div>
               <div class="historial-container" id="historialContainer">
                 <div class="historial-item">
-                  <span><i class="bi bi-info-circle me-2"></i> No hay eventos</span>
+                  <span><i class="bi bi-info-circle me-2"></i> Cargando historial...</span>
                 </div>
               </div>
             </div>
-            <!-- Actividad (logs en tiempo real) -->
+            <!-- Actividad -->
             <div class="tab-pane fade" id="actividad" role="tabpanel">
               <div class="d-flex justify-content-between align-items-center mb-2">
                 <small class="opacity-50">Actividad en tiempo real</small>
@@ -402,7 +421,7 @@
 
           <!-- FOOTER -->
           <div class="footer-info d-flex justify-content-between flex-wrap mt-3">
-            <span><i class="bi bi-wifi me-1"></i> WebSocket <span class="opacity-50">· PRO</span></span>
+            <span><i class="bi bi-wifi me-1"></i> WebSocket <span class="opacity-50">· Comunidad</span></span>
             <span><i class="bi bi-clock-history me-1"></i> <span id="timestampDisplay">--:--:--</span></span>
           </div>
 
@@ -415,9 +434,6 @@
   <!-- Bootstrap JS -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 
-  <!-- ============================================================ -->
-  <!-- LÓGICA PRINCIPAL                                              -->
-  <!-- ============================================================ -->
   <script>
     (function() {
       'use strict';
@@ -443,6 +459,8 @@
       const pinStatus = document.getElementById('pinStatus');
       const historialContainer = document.getElementById('historialContainer');
       const btnRefrescarHistorial = document.getElementById('btnRefrescarHistorial');
+      const historialCount = document.getElementById('historialCount');
+      const btnTestSound = document.getElementById('btnTestSound');
 
       // ---------- ESTADO ----------
       let alarmaActiva = false;
@@ -454,14 +472,131 @@
       let miUbicacion = null;
       let mapInstance = null;
       let marker = null;
+      let historialGlobal = [];
+      let audioContext = null;
 
-      // PIN por defecto (debe coincidir con server.js)
       const PIN_CORRECTO = '1234';
 
       // Inicializar Toast
       const toastElement = document.getElementById('liveToast');
       if (toastElement) {
         toastInstance = new bootstrap.Toast(toastElement, { autohide: true, delay: 4000 });
+      }
+
+      // ---------- SONIDO MEJORADO ----------
+      function getAudioContext() {
+        if (!audioContext) {
+          try {
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+          } catch (e) {
+            console.error('Error al crear AudioContext:', e);
+          }
+        }
+        // Reanudar si está suspendido (política de autoplay)
+        if (audioContext && audioContext.state === 'suspended') {
+          audioContext.resume().catch(e => console.warn('No se pudo reanudar AudioContext:', e));
+        }
+        return audioContext;
+      }
+
+      function reproducirSonidoAlarma(duracion = 3000) {
+        try {
+          const ctx = getAudioContext();
+          if (!ctx) return;
+
+          // Sonido de alarma más agresivo (alterna frecuencias)
+          const startTime = ctx.currentTime;
+          
+          // Frecuencia 1: 880Hz (La)
+          const osc1 = ctx.createOscillator();
+          const gain1 = ctx.createGain();
+          gain1.gain.setValueAtTime(0.3, startTime);
+          gain1.gain.exponentialRampToValueAtTime(0.001, startTime + duracion / 1000);
+          osc1.type = 'square';
+          osc1.frequency.setValueAtTime(880, startTime);
+          // Modulación para efecto de alarma
+          osc1.frequency.linearRampToValueAtTime(660, startTime + 0.2);
+          osc1.frequency.linearRampToValueAtTime(880, startTime + 0.4);
+          osc1.frequency.linearRampToValueAtTime(660, startTime + 0.6);
+          osc1.frequency.linearRampToValueAtTime(880, startTime + 0.8);
+          osc1.frequency.setValueAtTime(880, startTime + 1);
+          
+          osc1.connect(gain1);
+          gain1.connect(ctx.destination);
+          osc1.start(startTime);
+          osc1.stop(startTime + duracion / 1000);
+
+          // Frecuencia 2: 660Hz (Mi) para armonía
+          const osc2 = ctx.createOscillator();
+          const gain2 = ctx.createGain();
+          gain2.gain.setValueAtTime(0.2, startTime);
+          gain2.gain.exponentialRampToValueAtTime(0.001, startTime + duracion / 1000);
+          osc2.type = 'square';
+          osc2.frequency.setValueAtTime(660, startTime);
+          osc2.frequency.linearRampToValueAtTime(880, startTime + 0.3);
+          osc2.frequency.linearRampToValueAtTime(660, startTime + 0.5);
+          osc2.frequency.setValueAtTime(660, startTime + 0.7);
+          
+          osc2.connect(gain2);
+          gain2.connect(ctx.destination);
+          osc2.start(startTime);
+          osc2.stop(startTime + duracion / 1000);
+
+          console.log('🔊 Sonido de alarma reproduciéndose');
+        } catch (e) {
+          console.error('Error al reproducir sonido:', e);
+        }
+      }
+
+      function reproducirSonidoOff() {
+        try {
+          const ctx = getAudioContext();
+          if (!ctx) return;
+
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          gain.gain.setValueAtTime(0.2, ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(520, ctx.currentTime);
+          osc.frequency.exponentialRampToValueAtTime(400, ctx.currentTime + 0.2);
+          
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(ctx.currentTime);
+          osc.stop(ctx.currentTime + 0.3);
+          
+          console.log('🔇 Sonido de desactivación');
+        } catch (e) {
+          console.error('Error al reproducir sonido off:', e);
+        }
+      }
+
+      function probarSonido() {
+        // Crear AudioContext en respuesta a interacción del usuario
+        const ctx = getAudioContext();
+        if (ctx) {
+          // Reproducir un tono de prueba
+          try {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            gain.gain.setValueAtTime(0.2, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5);
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(600, ctx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(800, ctx.currentTime + 0.3);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start(ctx.currentTime);
+            osc.stop(ctx.currentTime + 0.5);
+            mostrarToast('🔊 Sonido de prueba OK');
+          } catch (e) {
+            console.error('Error en prueba de sonido:', e);
+            mostrarToast('❌ Error al probar sonido');
+          }
+        } else {
+          mostrarToast('❌ No se puede acceder al audio');
+        }
       }
 
       // ---------- MAPA ----------
@@ -501,49 +636,6 @@
             { enableHighAccuracy: true, timeout: 10000 }
           );
         });
-      }
-
-      // ---------- FUNCIONES DE SONIDO ----------
-      function reproducirSonidoAlarma(duracion = 3000) {
-        try {
-          const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-          const osc1 = audioCtx.createOscillator();
-          const osc2 = audioCtx.createOscillator();
-          const gain = audioCtx.createGain();
-          gain.gain.value = 0.3;
-          gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duracion / 1000);
-
-          osc1.type = 'square';
-          osc1.frequency.value = 880;
-          osc2.type = 'square';
-          osc2.frequency.value = 660;
-
-          osc1.connect(gain);
-          osc2.connect(gain);
-          gain.connect(audioCtx.destination);
-
-          osc1.start();
-          osc2.start();
-          osc1.stop(audioCtx.currentTime + duracion / 1000);
-          osc2.stop(audioCtx.currentTime + duracion / 1000);
-        } catch (e) {
-          console.warn('Sonido no disponible:', e);
-        }
-      }
-
-      function reproducirSonidoOff() {
-        try {
-          const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-          const osc = audioCtx.createOscillator();
-          const gain = audioCtx.createGain();
-          gain.gain.value = 0.2;
-          osc.type = 'sine';
-          osc.frequency.value = 520;
-          osc.connect(gain);
-          gain.connect(audioCtx.destination);
-          osc.start();
-          osc.stop(audioCtx.currentTime + 0.25);
-        } catch (e) {}
       }
 
       // ---------- FUNCIONES UI ----------
@@ -613,36 +705,52 @@
         }
       }
 
-      // ---------- HISTORIAL ----------
+      // ---------- HISTORIAL GLOBAL ----------
+      function renderizarHistorial(eventos) {
+        if (!eventos || eventos.length === 0) {
+          historialContainer.innerHTML = `
+            <div class="historial-item">
+              <span><i class="bi bi-info-circle me-2"></i> No hay eventos registrados</span>
+            </div>
+          `;
+          historialCount.textContent = '0';
+          return;
+        }
+
+        historialCount.textContent = eventos.length;
+
+        const mostrar = eventos.slice(-50).reverse();
+        historialContainer.innerHTML = mostrar.map((e, index) => {
+          const esActivacion = e.tipo === 'ALARMA_ACTIVADA';
+          const icono = esActivacion ? '🚨' : '⏹️';
+          const textoAccion = esActivacion ? 'Activó' : 'Detuvo';
+          const claseEvento = esActivacion ? 'evento-activacion' : 'evento-desactivacion';
+          const dispositivo = e.dispositivo || 'desconocido';
+          const hora = new Date(e.timestamp).toLocaleTimeString('es-ES', { hour12: false });
+          const fecha = new Date(e.timestamp).toLocaleDateString('es-ES');
+          const tieneUbicacion = e.lat && e.lng;
+          
+          return `
+            <div class="historial-item ${claseEvento}">
+              <span>
+                <strong>${icono} ${textoAccion}</strong>
+                <span class="opacity-75 ms-1">${dispositivo}</span>
+                ${tieneUbicacion ? `<span class="badge bg-primary bg-opacity-25 rounded-pill ms-1" title="Ver ubicación">📍</span>` : ''}
+              </span>
+              <span class="opacity-50 small">${fecha} ${hora}</span>
+            </div>
+          `;
+        }).join('');
+      }
+
       async function cargarHistorial() {
         try {
-          const response = await fetch('/api/historial?pin=' + encodeURIComponent(miPin));
+          const response = await fetch('/api/historial');
           const data = await response.json();
-          if (!Array.isArray(data) || data.length === 0) {
-            historialContainer.innerHTML = `
-              <div class="historial-item">
-                <span><i class="bi bi-info-circle me-2"></i> No hay eventos registrados</span>
-              </div>
-            `;
-            return;
+          if (Array.isArray(data)) {
+            historialGlobal = data;
+            renderizarHistorial(data);
           }
-          // Mostrar últimos 15
-          const ultimos = data.slice(-15).reverse();
-          historialContainer.innerHTML = ultimos.map(e => {
-            const tipo = e.tipo === 'ALARMA_ACTIVADA' ? '🚨 Activó' : '⏹️ Detuvo';
-            const ubicacion = e.ubicacion ? `📍 ${e.ubicacion.lat?.toFixed(4)}, ${e.ubicacion.lng?.toFixed(4)}` : '';
-            const hora = new Date(e.timestamp).toLocaleTimeString();
-            return `
-              <div class="historial-item">
-                <span>
-                  <strong>${tipo}</strong>
-                  <span class="opacity-50">${e.dispositivo || 'desconocido'}</span>
-                  ${ubicacion ? `<span class="badge bg-primary bg-opacity-25 rounded-pill ms-1">📍</span>` : ''}
-                </span>
-                <span class="opacity-50 small">${hora}</span>
-              </div>
-            `;
-          }).join('');
         } catch (e) {
           console.error('Error cargando historial:', e);
         }
@@ -672,7 +780,6 @@
             clearTimeout(reconnectTimer);
             reconnectTimer = null;
           }
-          // Registrar PIN automáticamente si ya está guardado
           if (miPin) {
             registrarPinEnServidor(miPin);
           }
@@ -681,7 +788,15 @@
         socket.onmessage = function(event) {
           try {
             const data = JSON.parse(event.data);
-            console.log('📨 Recibido:', data);
+            console.log('📨 Recibido:', data.type);
+
+            if (data.type === 'HISTORIAL_INICIAL') {
+              if (Array.isArray(data.data)) {
+                historialGlobal = data.data;
+                renderizarHistorial(data.data);
+              }
+              return;
+            }
 
             if (data.type === 'UPDATE_DEVICES') {
               deviceCounter.textContent = data.count;
@@ -701,38 +816,41 @@
               return;
             }
 
-            if (data.type === 'ALARMA_ACTIVADA') {
-              if (!alarmaActiva) {
-                alarmaActiva = true;
-                actualizarUI();
-                reproducirSonidoAlarma(3500);
-                agregarLog(`🚨 ALARMA ACTIVADA por ${data.from}`, 'alarma', data.from);
-                actualizarUltimaAccion(`Activada por ${data.from}`);
-                mostrarToast(`🔔 ¡ALARMA! Activada por ${data.from}`);
-                // Actualizar mapa si hay ubicación
-                if (data.lat && data.lng) {
-                  actualizarMapa(data.lat, data.lng, `Activada por ${data.from}`);
+            if (data.type === 'ALARMA_ACTIVADA' || data.type === 'ALARMA_DESACTIVADA') {
+              // FORZAR SONIDO SIEMPRE
+              if (data.type === 'ALARMA_ACTIVADA') {
+                // Reproducir sonido ALTAVOZ (más fuerte)
+                reproducirSonidoAlarma(4000);
+                if (!alarmaActiva) {
+                  alarmaActiva = true;
+                  actualizarUI();
+                  agregarLog(`🚨 ALARMA ACTIVADA por ${data.from}`, 'alarma', data.from);
+                  actualizarUltimaAccion(`Activada por ${data.from}`);
+                  mostrarToast(`🔔 ¡ALARMA! Activada por ${data.from}`);
+                  if (data.lat && data.lng) {
+                    actualizarMapa(data.lat, data.lng, `Activada por ${data.from}`);
+                  }
+                } else {
+                  agregarLog(`🔔 Refuerzo desde ${data.from}`, 'alarma', data.from);
                 }
-                // Recargar historial
-                cargarHistorial();
               } else {
-                reproducirSonidoAlarma(1500);
-                agregarLog(`🔔 Refuerzo desde ${data.from}`, 'alarma', data.from);
-              }
-              return;
-            }
-
-            if (data.type === 'ALARMA_DESACTIVADA') {
-              if (alarmaActiva) {
-                alarmaActiva = false;
-                actualizarUI();
                 reproducirSonidoOff();
-                agregarLog(`⏹️ Desactivada por ${data.from}`, 'info', data.from);
-                actualizarUltimaAccion(`Desactivada por ${data.from}`);
-                mostrarToast(`⏹️ Alarma detenida por ${data.from}`);
-                cargarHistorial();
+                if (alarmaActiva) {
+                  alarmaActiva = false;
+                  actualizarUI();
+                  agregarLog(`⏹️ Desactivada por ${data.from}`, 'info', data.from);
+                  actualizarUltimaAccion(`Desactivada por ${data.from}`);
+                  mostrarToast(`⏹️ Alarma detenida por ${data.from}`);
+                } else {
+                  agregarLog(`⏹️ Intento de desactivar (ya inactiva) desde ${data.from}`, 'info', data.from);
+                }
+              }
+
+              if (data.historial && Array.isArray(data.historial)) {
+                historialGlobal = data.historial;
+                renderizarHistorial(data.historial);
               } else {
-                agregarLog(`⏹️ Intento de desactivar (ya inactiva) desde ${data.from}`, 'info', data.from);
+                cargarHistorial();
               }
               return;
             }
@@ -781,7 +899,6 @@
           pin: pin,
           ubicacion: miUbicacion
         }));
-        // Guardar en localStorage para persistencia
         try {
           localStorage.setItem('miPin', pin);
         } catch (e) {}
@@ -801,7 +918,6 @@
             pin: miPin,
             timestamp: Date.now()
           };
-          // Incluir ubicación si está disponible
           if (miUbicacion) {
             mensaje.lat = miUbicacion.lat;
             mensaje.lng = miUbicacion.lng;
@@ -817,7 +933,6 @@
       }
 
       // ---------- EVENTOS ----------
-      // Registrar PIN
       btnRegistrarPin.addEventListener('click', function() {
         const pin = pinInput.value.trim();
         if (pin.length < 4) {
@@ -833,25 +948,25 @@
         }
       });
 
-      // Activar alarma
       btnActivar.addEventListener('click', function() {
+        // Forzar AudioContext al hacer clic
+        getAudioContext();
+        
         if (alarmaActiva) {
-          reproducirSonidoAlarma(1500);
+          reproducirSonidoAlarma(2000);
           agregarLog('🔔 Alarma ya activa (refuerzo local)', 'alarma', miId);
           return;
         }
         if (enviarMensaje('ALARMA_ACTIVADA')) {
           alarmaActiva = true;
           actualizarUI();
-          reproducirSonidoAlarma(3500);
+          reproducirSonidoAlarma(4000);
           agregarLog('🚨 TÚ activaste la alarma', 'alarma', miId);
           actualizarUltimaAccion('Activada por ti');
           mostrarToast('🔔 ¡Activaste la alarma comunitaria!');
-          cargarHistorial();
         }
       });
 
-      // Desactivar alarma
       btnDesactivar.addEventListener('click', function() {
         if (!alarmaActiva) {
           reproducirSonidoOff();
@@ -865,17 +980,18 @@
           agregarLog('⏹️ TÚ desactivaste la alarma', 'info', miId);
           actualizarUltimaAccion('Desactivada por ti');
           mostrarToast('⏹️ Desactivaste la alarma');
-          cargarHistorial();
         }
       });
 
-      // Limpiar logs
+      btnTestSound.addEventListener('click', function() {
+        probarSonido();
+      });
+
       clearLogsBtn.addEventListener('click', function() {
         logList.innerHTML = '';
         agregarLog('🧹 Registro limpiado', 'info');
       });
 
-      // Refrescar historial
       btnRefrescarHistorial.addEventListener('click', function() {
         cargarHistorial();
         mostrarToast('🔄 Historial actualizado');
@@ -883,16 +999,13 @@
 
       // ---------- INICIALIZAR ----------
       async function iniciar() {
-        // Obtener ubicación
         miUbicacion = await obtenerUbicacion();
         if (miUbicacion) {
-          console.log('📍 Ubicación obtenida:', miUbicacion);
-          // Mostrar en mapa (posición actual)
+          console.log('📍 Ubicación obtenida');
           iniciarMapa();
           actualizarMapa(miUbicacion.lat, miUbicacion.lng, 'Tu ubicación');
         }
 
-        // Recuperar PIN guardado
         try {
           const pinGuardado = localStorage.getItem('miPin');
           if (pinGuardado) {
@@ -901,19 +1014,21 @@
           }
         } catch (e) {}
 
-        // Conectar WebSocket
         conectarWebSocket();
         actualizarUI();
         agregarLog(`🚀 ${miId} conectándose...`, 'info');
         myDeviceId.textContent = miId;
 
-        // Cargar historial después de conectar
         setTimeout(cargarHistorial, 2000);
+
+        // Intentar activar AudioContext con cualquier clic
+        document.addEventListener('click', function() {
+          getAudioContext();
+        }, { once: false });
       }
 
       iniciar();
 
-      // ---------- RECUPERAR CONEXIÓN ----------
       document.addEventListener('visibilitychange', function() {
         if (!document.hidden && (!socket || socket.readyState !== WebSocket.OPEN)) {
           if (reconnectTimer) {
