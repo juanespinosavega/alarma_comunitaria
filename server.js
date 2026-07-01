@@ -8,16 +8,18 @@ const app = express();
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
-// Crear carpeta data si no existe
-const dataDir = path.join(__dirname, 'data');
-if (!fs.existsSync(dataDir)) {
-  fs.mkdirSync(dataDir);
+// ---------- HISTORIAL FUERA DE LA CARPETA ----------
+// Usamos la carpeta /tmp en Render (persiste mientras el servicio está activo)
+// O puedes usar la ruta absoluta que quieras
+const HISTORIAL_DIR = process.env.HISTORIAL_DIR || '/tmp/alarma-historial';
+const historialFile = path.join(HISTORIAL_DIR, 'historial.json');
+
+// Crear directorio si no existe
+if (!fs.existsSync(HISTORIAL_DIR)) {
+  fs.mkdirSync(HISTORIAL_DIR, { recursive: true });
 }
 
-// Archivo de historial
-const historialFile = path.join(dataDir, 'historial.json');
-
-// Función para leer historial
+// ---------- FUNCIONES DE HISTORIAL ----------
 function leerHistorial() {
   try {
     if (fs.existsSync(historialFile)) {
@@ -30,7 +32,6 @@ function leerHistorial() {
   return [];
 }
 
-// Función para guardar en historial
 function guardarHistorial(evento) {
   try {
     const historial = leerHistorial();
@@ -38,39 +39,34 @@ function guardarHistorial(evento) {
       ...evento,
       timestamp: new Date().toISOString()
     });
-    // Mantener solo los últimos 500 eventos
-    if (historial.length > 500) {
-      historial.splice(0, historial.length - 500);
+    // Mantener últimos 1000 eventos
+    if (historial.length > 1000) {
+      historial.splice(0, historial.length - 1000);
     }
     fs.writeFileSync(historialFile, JSON.stringify(historial, null, 2));
+    console.log(`📝 Historial guardado: ${evento.tipo} por ${evento.dispositivo}`);
+    console.log(`📁 Ubicación: ${historialFile}`);
   } catch (e) {
     console.error('Error al guardar historial:', e);
   }
 }
 
-// Servir archivos estáticos
+// ---------- RUTAS API ----------
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Ruta para obtener historial (API)
 app.get('/api/historial', (req, res) => {
   const historial = leerHistorial();
-  // Filtrar por PIN si se envía
-  const pin = req.query.pin;
-  if (pin) {
-    // Solo devolver eventos si el PIN es correcto
-    const historialFiltrado = historial.filter(e => e.pin === pin);
-    return res.json(historialFiltrado);
-  }
-  res.json(historial);
+  const ultimos = historial.slice(-100);
+  res.json(ultimos);
 });
 
-// Ruta principal
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 // ---------- WEBSOCKET ----------
-const clients = new Map(); // guardamos el PIN por cliente
+const clients = new Map();
+const PIN_CORRECTO = '1234'; // Cambia este PIN
 
 wss.on('connection', (ws) => {
   const clientId = 'Vecino-' + Math.floor(Math.random() * 10000);
@@ -78,7 +74,14 @@ wss.on('connection', (ws) => {
   
   console.log(`🟢 Conectado: ${clientId} (${clients.size} en línea)`);
 
-  // Notificar actualización de dispositivos
+  // Enviar historial al conectar
+  const historial = leerHistorial();
+  const ultimos = historial.slice(-50);
+  ws.send(JSON.stringify({
+    type: 'HISTORIAL_INICIAL',
+    data: ultimos
+  }));
+
   broadcast({
     type: 'UPDATE_DEVICES',
     count: clients.size,
@@ -92,7 +95,6 @@ wss.on('connection', (ws) => {
       
       console.log(`📨 ${clientData.id}:`, data.type);
 
-      // Manejar registro de PIN
       if (data.type === 'REGISTRAR_PIN') {
         clientData.pin = data.pin;
         clientData.ubicacion = data.ubicacion || null;
@@ -105,13 +107,10 @@ wss.on('connection', (ws) => {
         return;
       }
 
-      // Verificar PIN para acciones de alarma
       if (data.type === 'ALARMA_ACTIVADA' || data.type === 'ALARMA_DESACTIVADA') {
-        // El PIN debe venir en el mensaje
         const pinIngresado = data.pin;
-        const pinCorrecto = '1234'; // PIN fijo (cámbialo por el que quieras)
         
-        if (pinIngresado !== pinCorrecto) {
+        if (pinIngresado !== PIN_CORRECTO) {
           ws.send(JSON.stringify({
             type: 'ERROR_PIN',
             message: 'PIN incorrecto. No autorizado.'
@@ -119,7 +118,6 @@ wss.on('connection', (ws) => {
           return;
         }
 
-        // Guardar en historial
         const evento = {
           tipo: data.type,
           dispositivo: clientData.id,
@@ -130,17 +128,23 @@ wss.on('connection', (ws) => {
         };
         guardarHistorial(evento);
 
-        // Reenviar a TODOS
+        const historialActualizado = leerHistorial();
+        const ultimosEventos = historialActualizado.slice(-50);
+
+        // ENVIAR A TODOS CON EL HISTORIAL ACTUALIZADO
         broadcast({
           ...data,
           from: clientData.id,
           ubicacion: clientData.ubicacion || data.ubicacion || null,
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
+          historial: ultimosEventos,
+          // AÑADIR SONIDO FORZADO
+          forceSound: true,
+          soundType: data.type === 'ALARMA_ACTIVADA' ? 'alarma' : 'off'
         });
         return;
       }
 
-      // Mensaje genérico
       if (data.from) {
         broadcast(data);
       }
@@ -177,6 +181,6 @@ function broadcast(data) {
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
   console.log(`🚀 Servidor corriendo en http://localhost:${PORT}`);
-  console.log(`📱 Comparte esta URL con tus vecinos`);
-  console.log(`🔑 PIN por defecto: 1234 (cámbialo en server.js)`);
+  console.log(`📁 Historial guardado en: ${historialFile}`);
+  console.log(`🔑 PIN: ${PIN_CORRECTO}`);
 });
